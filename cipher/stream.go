@@ -3,6 +3,8 @@ package cipher
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
+	"crypto/rc4"
 
 	"github.com/Yawning/chacha20"
 	"github.com/shadowsocks/go-shadowsocks2/shadowstream"
@@ -58,4 +60,25 @@ func Chacha20IETF(key []byte) (shadowstream.Cipher, error) {
 		return nil, KeySizeError(chacha20.KeySize)
 	}
 	return chacha20ietfkey(key), nil
+}
+
+type rc4md5key []byte
+
+func (k rc4md5key) IVSize() int                       { return 16 }
+func (k rc4md5key) Decrypter(iv []byte) cipher.Stream { return k.Encrypter(iv) }
+func (k rc4md5key) Encrypter(iv []byte) cipher.Stream {
+	h := md5.New()
+	h.Write(k)
+	h.Write(iv)
+	rc4key := h.Sum(nil)
+
+	ciph, err := rc4.NewCipher(rc4key)
+	if err != nil {
+		panic(err) // should never happen
+	}
+	return ciph
+}
+
+func RC4MD5(key []byte) (shadowstream.Cipher, error) {
+	return rc4md5key(key), nil
 }
